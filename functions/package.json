@@ -1,0 +1,10 @@
+{
+  "name": "bahouan-notifications",
+  "description": "Envoi des notifications (téléphone fermé) du Lycée de Bahouan",
+  "main": "index.js",
+  "engines": { "node": "20" },
+  "dependencies": {
+    "firebase-admin": "^12.0.0",
+    "firebase-functions": "^5.0.0"
+  }
+}
