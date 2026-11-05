@@ -1,0 +1,76 @@
+/* Animation 3D d'ouverture - Lycée de Bahouan : cube de formules, logo blanc, orbites */
+html.intro-on{overflow:hidden}
+#intro{position:fixed;inset:0;z-index:99999;overflow:hidden;color:#fff;font-family:var(--sans,system-ui,sans-serif);
+  background:radial-gradient(ellipse at 50% 38%,#12397a 0,#0a2a5c 34%,#041633 68%,#020a1c 100%);
+  transition:opacity .9s ease,transform .9s cubic-bezier(.7,0,.3,1),filter .9s}
+#intro.out{opacity:0;transform:scale(1.18);filter:blur(10px);pointer-events:none}
+#intro canvas{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none}
+#intro-cv-back{z-index:1}#intro-cv-front{z-index:5}
+#intro-halo{position:absolute;z-index:1;width:var(--s2);height:var(--s2);margin:calc(var(--s2) / -2) 0 0 calc(var(--s2) / -2);border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle,rgba(91,155,255,.38) 0,rgba(91,155,255,.12) 38%,transparent 68%);opacity:0;transition:opacity 1.4s ease}
+#intro.show #intro-halo{opacity:1}
+#intro-pulse{position:absolute;z-index:1;width:var(--s);height:var(--s);margin:calc(var(--s) / -2) 0 0 calc(var(--s) / -2);border:2px solid #ffd277;border-radius:50%;opacity:0;pointer-events:none}
+#intro.show #intro-pulse{animation:ipulse1 1.8s .5s ease-out both}
+@keyframes ipulse1{0%{opacity:.9;transform:scale(.4)}100%{opacity:0;transform:scale(5)}}
+
+/* monde 3D : même perspective (900px) que le calcul des orbites */
+#intro-world{position:absolute;z-index:3;width:0;height:0;perspective:900px;perspective-origin:50% 50%}
+#intro-cube{position:absolute;left:0;top:0;width:0;height:0;transform-style:preserve-3d;opacity:0}
+#intro.show #intro-cube{opacity:1;transition:opacity .8s ease}
+.cf{position:absolute;justify-content:space-between;width:var(--s);height:var(--s);margin:calc(var(--s) / -2) 0 0 calc(var(--s) / -2);box-sizing:border-box;backface-visibility:hidden;-webkit-backface-visibility:hidden;
+  border:1.5px solid rgba(255,210,119,.85);border-radius:6px;
+  background:
+    radial-gradient(circle at 50% 50%,rgba(255,255,255,.07) 0,transparent 58%),
+    repeating-linear-gradient(0deg,rgba(140,190,255,.12) 0 1px,transparent 1px 14px),
+    repeating-linear-gradient(90deg,rgba(140,190,255,.12) 0 1px,transparent 1px 14px),
+    linear-gradient(135deg,rgba(24,78,160,.26),rgba(6,25,61,.34));
+  box-shadow:inset 0 0 calc(var(--s) * .16) rgba(91,155,255,.35),0 0 calc(var(--s) * .12) rgba(91,155,255,.35);
+  display:flex;flex-direction:column;justify-content:space-between;align-items:center;padding:calc(var(--s) * .07) calc(var(--s) * .05);text-align:center;font-family:"Cambria Math","STIX Two Math","Latin Modern Math","Times New Roman",serif}
+.cf::before,.cf::after{content:"";position:absolute;width:calc(var(--s) * .07);height:calc(var(--s) * .07);border:2px solid #ffd277;pointer-events:none}
+.cf::before{left:6px;top:6px;border-right:0;border-bottom:0}.cf::after{right:6px;bottom:6px;border-left:0;border-top:0}
+.cf small{font:700 calc(var(--s) * .058)/1 var(--sans,system-ui);letter-spacing:.2em;text-transform:uppercase;color:#ffd277;opacity:.95}
+.cf b{display:block;font-weight:400;font-style:italic;font-size:calc(var(--s) * .15);line-height:1.1;color:#fff;text-shadow:0 0 14px rgba(140,190,255,.7);white-space:nowrap}
+.cf b.l{font-size:calc(var(--s) * .105)}
+.cf em{font-size:calc(var(--s) * .092);color:#bcd6ff;font-style:italic;white-space:nowrap}
+.cf .hd{display:flex;flex-direction:column;align-items:center;gap:calc(var(--s) * .035)}
+.cf-f{transform:translateZ(calc(var(--s) / 2))}
+.cf-b{transform:rotateY(180deg) translateZ(calc(var(--s) / 2))}
+.cf-r{transform:rotateY(90deg) translateZ(calc(var(--s) / 2))}
+.cf-l{transform:rotateY(-90deg) translateZ(calc(var(--s) / 2))}
+.cf-t{transform:rotateX(90deg) translateZ(calc(var(--s) / 2))}
+.cf-d{transform:rotateX(-90deg) translateZ(calc(var(--s) / 2))}
+#intro-logo{max-width:none!important;position:absolute;z-index:4;width:calc(var(--s) * .56);height:auto;transform:translate(-50%,-50%);opacity:0;filter:drop-shadow(0 0 calc(var(--s) * .07) rgba(120,180,255,.95)) drop-shadow(0 2px 6px rgba(0,10,40,.6));pointer-events:none;user-select:none}
+#intro.show #intro-logo{opacity:1;transition:opacity 1s .7s ease}
+
+/* petits éléments en orbite */
+.tk{position:absolute;left:0;top:0;z-index:2;opacity:0;pointer-events:none;will-change:transform,opacity;
+  font:italic 400 clamp(1.1rem,calc(var(--s) * .17),2.1rem)/1 "Cambria Math","STIX Two Math","Times New Roman",serif;color:#ffd277;text-shadow:0 0 12px rgba(255,200,90,.8)}
+.tk.dot{width:7px;height:7px;border-radius:50%;background:radial-gradient(circle,#fff 0,#8fc0ff 45%,transparent 72%);box-shadow:0 0 10px #5b9bff;font-size:0}
+.tk.mc{width:0;height:0}
+.mini{position:absolute;left:0;top:0;width:0;height:0;perspective:160px}
+.mini u{position:absolute;left:0;top:0;width:0;height:0;transform-style:preserve-3d;animation:imini 6s linear infinite;text-decoration:none}
+.mini i{position:absolute;width:16px;height:16px;margin:-8px 0 0 -8px;border:1.5px solid #ffd277;background:rgba(24,78,160,.45);box-shadow:0 0 8px rgba(91,155,255,.7)}
+.mini i:nth-child(1){transform:translateZ(8px)}.mini i:nth-child(2){transform:rotateY(180deg) translateZ(8px)}.mini i:nth-child(3){transform:rotateY(90deg) translateZ(8px)}
+.mini i:nth-child(4){transform:rotateY(-90deg) translateZ(8px)}.mini i:nth-child(5){transform:rotateX(90deg) translateZ(8px)}.mini i:nth-child(6){transform:rotateX(-90deg) translateZ(8px)}
+@keyframes imini{from{transform:rotateX(20deg) rotateY(0)}to{transform:rotateX(380deg) rotateY(360deg)}}
+
+/* texte */
+#intro-text{position:absolute;z-index:6;left:0;right:0;text-align:center;padding:0 14px;pointer-events:none}
+#intro-title{margin:0;font:500 clamp(1.3rem,5.4vw,3.2rem)/1.1 var(--serif,Georgia,serif);letter-spacing:.12em;display:flex;flex-wrap:wrap;justify-content:center;gap:0 .3em;text-shadow:0 2px 18px rgba(0,10,40,.9)}
+#intro-title .mot{display:inline-flex;white-space:nowrap}
+#intro-title .mot span{display:inline-block;opacity:0;transform:translateY(.5em);filter:blur(6px)}
+#intro.titre #intro-title .mot span{animation:ichar .7s cubic-bezier(.2,.9,.3,1) forwards;animation-delay:calc(var(--i) * 40ms)}
+@keyframes ichar{to{opacity:1;transform:none;filter:none}}
+#intro-trait{width:0;height:2px;margin:12px auto 10px;background:linear-gradient(90deg,transparent,#ffd277,transparent)}
+#intro.titre #intro-trait{width:min(300px,70vw);transition:width 1.2s .3s cubic-bezier(.2,.9,.3,1)}
+#intro-devise{margin:0 auto!important;max-width:none!important;padding-left:.3em;font-size:clamp(.78rem,2.4vw,1.05rem);letter-spacing:.3em;text-transform:uppercase;color:#ffd277;opacity:0;text-shadow:0 2px 12px rgba(0,0,20,.95)}
+#intro.titre #intro-devise{animation:ifade .9s .7s ease forwards}
+@keyframes ifade{to{opacity:1}}
+#intro-skip,#intro-enter{white-space:nowrap;position:absolute;border:0;cursor:pointer;font:600 .95rem var(--sans,system-ui);z-index:7}
+#intro-skip{right:18px;top:16px;background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.35);padding:9px 16px;backdrop-filter:blur(6px);opacity:0;transition:opacity .4s}
+#intro.skipok #intro-skip{opacity:1}#intro-skip:hover{background:rgba(255,255,255,.22)}
+#intro-enter{left:50%;bottom:7vh;transform:translateX(-50%) translateY(16px);background:#c9a24a;color:#06193d;padding:14px 34px;letter-spacing:.06em;opacity:0;pointer-events:none;box-shadow:0 0 30px rgba(201,162,74,.5)}
+#intro.pret #intro-enter{opacity:1;transform:translateX(-50%);pointer-events:auto;transition:opacity .6s,transform .6s}
+#intro-bar{position:absolute;left:0;bottom:0;height:3px;z-index:7;background:linear-gradient(90deg,#1d4f9c,#c9a24a);width:0}
+@media (max-width:600px){#intro-devise{letter-spacing:.16em;font-size:.7rem}}
+@media (prefers-reduced-motion:reduce){#intro{display:none!important}html.intro-on{overflow:auto}}
