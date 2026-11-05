@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /administration.html
+Disallow: /espace-eleve.html
+Disallow: /espace-parent.html
+Disallow: /connexion.html
+
+Sitemap: https://lyceedebahouan.org/sitemap.xml

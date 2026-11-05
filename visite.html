@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+
+<title>Planifier une visite | Lycée de Bahouan</title>
+<meta name="description" content="Planifiez une visite du Lycée de Bahouan : choisissez une date et le secrétariat vous confirme.">
+<link rel="icon" type="image/jpeg" href="images/logo.jpg">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0a2a5c">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,400&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css?v=24.0">
+</head>
+<body>
+<div id="site-header"></div>
+<main>
+<section class="hero page" data-img="banniere-visite" style="background-image:url('images/visite.jpg')"><div class="wrap"><h1 data-cms="h1_2eda904">Planifier une visite</h1><p data-cms="p_b48f260" class="lead">Rencontrer l'équipe, voir les classes, poser vos questions.</p></div></section>
+
+<section class="section"><div class="wrap cols">
+  <div><h2 data-cms="h2_f882104">Venez voir le lycée, <em>rencontrer l'équipe</em></h2>
+  <p data-cms="p_cbb6d04">Choisissez le jour qui vous convient. Le secrétariat vous rappelle pour confirmer l'heure.</p>
+  <form class="form" id="f-visite"><input type="hidden" name="type" value="visite">
+    <label>Nom et prénom<input name="nom" required autocomplete="name"></label>
+    <label>Téléphone (WhatsApp si possible)<input name="telephone" type="tel" required autocomplete="tel"></label>
+    <label>Adresse e-mail (facultatif)<input name="email" type="email"></label>
+    <label>Jour souhaité<input name="dateVisite" type="date" required></label>
+    <label>Nombre de personnes<input name="personnes" type="number" min="1" max="10" value="1"></label>
+    <label>Niveau concerné<select name="niveau"><option>Seconde</option><option>Première</option><option>Terminale</option><option>Je ne sais pas encore</option></select></label>
+    <label>Précisions (facultatif)<textarea name="message"></textarea></label>
+    <button class="btn dark" type="submit">Demander une visite</button><div class="msg" role="status"></div></form></div>
+  <aside class="carte-info"><h3 data-cms="h3_b3950c3">Bon à savoir</h3><ul><li data-cms="li_a276aea">Visites du lundi au vendredi, de 7h30 à 16h30.</li><li data-cms="li_1dde5d8">Samedi matin, de 8h00 à 12h00, au secrétariat.</li><li data-cms="li_fe8db02">Pensez à apporter l'acte de naissance et le dernier relevé de notes si vous souhaitez inscrire votre enfant.</li></ul></aside>
+</div></section>
+</main>
+<div id="site-footer"></div>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="assets/config.js?v=24.0"></script>
+<script src="assets/site.js?v=24.0"></script>
+<script src="assets/i18n.js?v=24.0"></script>
+<script src="assets/auth.js?v=24.0"></script>
+<script src="assets/faq-data.js?v=24.0"></script>
+<script src="assets/extras.js?v=24.0"></script>
+<script>var d=document.querySelector("[name=dateVisite]"); if(d) d.min=new Date().toISOString().slice(0,10); bindForm(document.getElementById("f-visite"),"demandes","Merci, votre demande de visite est enregistrée. Le secrétariat vous rappelle pour confirmer.");</script>
+</body>
+</html>

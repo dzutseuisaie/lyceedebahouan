@@ -1,0 +1,382 @@
+rules_version = '2';
+
+/* ============================================================
+   RÈGLES DE SÉCURITÉ FIRESTORE - Lycée de Bahouan
+   À copier dans Firebase > Firestore Database > Règles > Publier.
+   Principe : tout est refusé par défaut. Chaque collection n'ouvre
+   que le strict nécessaire.
+   ============================================================ */
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /* ---------- Fonctions ---------- */
+    /* Connecté avec un vrai compte (élève, enseignant, administrateur). Les sessions anonymes des anciens élèves n'en font pas partie. */
+    function signedIn() { return request.auth != null && request.auth.token.firebase.sign_in_provider != 'anonymous'; }
+    /* Toute session, y compris anonyme (anciens élèves qui ont rempli le formulaire). */
+    function hasAuth() { return request.auth != null; }
+    function isAdmin() {
+      return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+    /* Super administrateur : document admins/{uid} avec role = 'super' (créé dans la console Firebase). */
+    function isSuper() {
+      return isAdmin() && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.get('role', '') == 'super';
+    }
+    /* Enseignant validé par le super administrateur : fiche enseignants/{uid} avec statut = 'valide'. */
+    function ens() { return get(/databases/$(database)/documents/enseignants/$(request.auth.uid)).data; }
+    function isEns() {
+      return signedIn() && exists(/databases/$(database)/documents/enseignants/$(request.auth.uid)) && ens().statut == 'valide';
+    }
+    function ensClasse(c) { return isEns() && c in ens().classes; }
+    function ensMatId(m)  { return isEns() && m in ens().matiereIds; }     /* identifiant cours : eleve-math1, physique2… */
+    function ensMatNom(m) { return isEns() && m in ens().matiereNoms; }    /* nom affiché : Mathématiques… */
+    function ensNote(m)   { return isEns() && m in ens().notesNoms; }      /* colonne de la feuille de notes */
+    function str(v, n) { return v is string && v.size() <= n; }
+    function optStr(d, k, n) { return !(k in d) || str(d[k], n); }
+    function isNow(t) { return t == request.time; }
+    function codeOk(c) { return c.matches('[A-Za-z0-9-]{8,40}'); }   /* tolère aussi les anciens codes de suivi */
+
+    /* ---------- Administrateurs ----------
+       Seule la console Firebase peut créer un document admins/{uid}.
+       Un utilisateur ne peut lire que son propre document (pour savoir s'il est admin). */
+    match /admins/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid;
+      allow list, write: if false;
+    }
+
+    /* ---------- Enseignants : demande libre, validation réservée au super administrateur ---------- */
+    match /enseignants/{uid} {
+      allow get: if isSuper() || (signedIn() && request.auth.uid == uid);
+      allow list: if isAdmin();   /* l'administration lit les enseignants pour publier le nom du professeur de chaque matière sur le bulletin */
+      allow create: if signedIn() && request.auth.uid == uid && request.resource.data.uid == uid
+        && request.resource.data.statut == 'attente'
+        && request.resource.data.keys().hasOnly(['uid','nom','civilite','email','matieres','matiereIds','matiereNoms','notesNoms','classes','statut','createdAt'])
+        && str(request.resource.data.nom, 80) && str(request.resource.data.email, 120)
+        && request.resource.data.matieres is list && request.resource.data.matieres.size() <= 12
+        && request.resource.data.classes is list && request.resource.data.classes.size() <= 12;
+      allow update, delete: if isSuper();
+    }
+
+    /* ---------- Parents : un compte par parent ----------
+       Le parent crée son compte (e-mail ou Google), puis enregistre dans parents/{uid} le code de suivi de chaque enfant.
+       Lui seul (et l'administration) lit et modifie sa fiche. */
+    function parentOk(d) {
+      return d.keys().hasOnly(['uid','nom','email','enfants','createdAt','jeton']) && optStr(d, 'jeton', 40)
+        && str(d.nom, 80) && optStr(d, 'email', 120)
+        && (!('enfants' in d) || (d.enfants is list && d.enfants.size() <= 12))
+        && (!('createdAt' in d) || d.createdAt is number);
+    }
+    /* Ajout d'un enfant = un code parent à usage unique (codes_parent/{code}) consommé juste avant (étape 1) :
+       le code doit être marqué utilisé par CE compte, et l'enfant ajouté doit être celui du code (étape 2). */
+    function lienParent(d) {
+      return 'jeton' in d && codeOk(d.jeton)
+        && get(/databases/$(database)/documents/codes_parent/$(d.jeton)).data.utilise == true
+        && get(/databases/$(database)/documents/codes_parent/$(d.jeton)).data.par == request.auth.uid
+        && d.enfants[d.enfants.size() - 1].code == get(/databases/$(database)/documents/codes_parent/$(d.jeton)).data.suivi;
+    }
+    match /parents/{uid} {
+      allow get: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow list: if isAdmin();
+      allow create: if signedIn() && request.auth.uid == uid && request.resource.data.uid == uid && parentOk(request.resource.data)
+        && (request.resource.data.get('enfants', []).size() == 0
+            || (request.resource.data.enfants.size() == 1 && lienParent(request.resource.data)));
+      allow update: if signedIn() && request.auth.uid == uid && request.resource.data.uid == uid && parentOk(request.resource.data)
+        && (   (request.resource.data.get('enfants', []).size() <= resource.data.get('enfants', []).size()
+                && resource.data.get('enfants', []).hasAll(request.resource.data.get('enfants', [])))      /* retrait ou aucun changement */
+            || (request.resource.data.get('enfants', []).size() == resource.data.get('enfants', []).size() + 1
+                && request.resource.data.get('enfants', []).hasAll(resource.data.get('enfants', []))
+                && lienParent(request.resource.data)));                                                  /* ajout : code parent obligatoire */
+      allow delete: if isAdmin() || (signedIn() && request.auth.uid == uid);
+    }
+
+    /* ---------- Codes parent à usage unique ----------
+       Créés par le super administrateur. Lecture d'UN code connu (12 caractères aléatoires), jamais de liste.
+       Un parent connecté peut le marquer « utilisé » une seule fois, à son nom. */
+    match /codes_parent/{c} {
+      allow get: if signedIn() && codeOk(c);
+      allow list: if isSuper();
+      allow create: if isSuper() && codeOk(c) && codeOk(request.resource.data.get('suivi', ''))
+        && request.resource.data.keys().hasOnly(['suivi','nom','classe','cree','exp','utilise','par'])
+        && request.resource.data.utilise == false && request.resource.data.get('par', '') == ''
+        && request.resource.data.exp is number;
+      allow update: if signedIn() && resource.data.utilise == false && resource.data.exp > request.time.toMillis()
+        && request.resource.data.utilise == true && request.resource.data.par == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['utilise','par','utiliseLe']);
+      allow delete: if isSuper();
+    }
+
+    /* ---------- Élèves : chacun ne voit que sa fiche ---------- */
+    function eleveOk(d) {
+      return d.keys().hasOnly(['nom','prenom','age','classe','annee','matricule','naissance','sexe','redoublant','email','uid','code','dateInscription','statut'])
+        && str(d.nom, 80) && optStr(d, 'prenom', 80) && optStr(d, 'age', 3) && optStr(d, 'classe', 30)
+        && optStr(d, 'annee', 9) && optStr(d, 'matricule', 40) && optStr(d, 'naissance', 12) && optStr(d, 'sexe', 1) && optStr(d, 'redoublant', 3) && optStr(d, 'email', 120)
+        && optStr(d, 'dateInscription', 60) && (!('code' in d) || (str(d.code, 14) && codeOk(d.code)));
+    }
+    function mailFiche(d) { return request.auth.token.email_verified == true && d.email == request.auth.token.email; }
+    match /eleves/{id} {
+      /* Lecture d'un document inexistant à son propre identifiant : autorisée (sinon un nouvel élève ne peut pas savoir qu'il n'a pas encore de fiche). */
+      allow get: if (signedIn() && resource == null && id == request.auth.uid) || isAdmin() || ensClasse(resource.data.get('classe', ''))
+        || (signedIn() && resource.data.uid == request.auth.uid) || mailFiche(resource.data);
+      allow list: if isAdmin() || ensClasse(resource.data.get('classe', '')) || (signedIn() && resource.data.uid == request.auth.uid) || mailFiche(resource.data);
+      allow create: if isAdmin()
+        || (signedIn() && id == request.auth.uid && request.resource.data.uid == request.auth.uid && eleveOk(request.resource.data)
+            && request.resource.data.get('statut', '') == 'attente');   /* un élève qui s'inscrit est toujours en attente */
+      allow update: if isAdmin()
+        || (signedIn() && resource.data.uid == request.auth.uid && request.resource.data.uid == request.auth.uid
+            && eleveOk(request.resource.data)
+            && (!('code' in resource.data) || request.resource.data.code == resource.data.code)
+            && request.resource.data.get('statut', '~') == resource.data.get('statut', '~'))   /* l'élève ne peut pas se valider lui-même */
+        /* Fiche créée par l'administration avec l'adresse Google de l'élève : à sa première connexion il la reprend (seul le champ uid est ajouté). */
+        || (signedIn() && mailFiche(resource.data) && resource.data.get('uid', '') == '' && request.resource.data.uid == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['uid']))
+        /* Fiche pré-enregistrée (liste d'inscription) : l'élève qui a retrouvé son nom (donc l'identifiant de la fiche, lu dans roster/{clé})
+           la relie à son compte, une seule fois : uid vide → uid de l'élève. Seuls uid, e-mail et âge peuvent changer ; nom, classe, notes et statut restent intacts. */
+        || (signedIn() && resource.data.get('uid', '') == '' && request.resource.data.uid == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['uid', 'email', 'age'])
+            && eleveOk(request.resource.data));
+      allow delete: if isAdmin();
+    }
+
+    /* ---------- Liste d'inscription : roster/{clé} = { eleveId, nom, prenom, classe, annee, updated } ----------
+       La clé est l'empreinte (SHA-256) du nom + classe + année : lecture d'UN document connu, jamais de liste. Écriture : administration. */
+    match /roster/{key} {
+      allow get: if signedIn();
+      allow list: if false;
+      allow write: if isAdmin();
+    }
+
+    /* ---------- Classements : moyennes anonymes + coefficients d'une classe ----------
+       Document « <année>_<classe> » : effectif, liste de moyennes (sans noms) et coefficients des matières.
+       Lisible par l'administration, par les enseignants de la classe et par les élèves VALIDÉS de cette classe.
+       Écriture : administration seulement. */
+    match /classements/{id} {
+      allow get: if isAdmin()
+        || ensClasse(resource.data.get('classe', ''))
+        || (signedIn() && exists(/databases/$(database)/documents/eleves/$(request.auth.uid))
+            && get(/databases/$(database)/documents/eleves/$(request.auth.uid)).data.get('statut', 'valide') == 'valide'
+            && get(/databases/$(database)/documents/eleves/$(request.auth.uid)).data.get('classe', '') == resource.data.get('classe', ''));
+      allow list: if false;
+      allow write: if isAdmin();
+    }
+
+    /* ---------- Suivi (notes et présence) : lisible seulement avec le code de l'élève ----------
+       Le code (12 caractères aléatoires) sert d'identifiant du document : il n'y a ni liste ni recherche possible.
+       Seule l'administration écrit les notes et la présence. */
+    match /suivi/{code} {
+      allow get: if signedIn();
+      allow list: if isAdmin();
+      allow create: if isAdmin() || (ensClasse(request.resource.data.get('classe', '')) && codeOk(code))
+        || (signedIn() && codeOk(code) && request.resource.data.eleveId == request.auth.uid
+            && request.resource.data.keys().hasOnly(['eleveId','nom','prenom','classe','annee','updated'])
+            && str(request.resource.data.nom, 80) && optStr(request.resource.data, 'prenom', 80)
+            && optStr(request.resource.data, 'classe', 30) && optStr(request.resource.data, 'annee', 9));
+      allow update: if isAdmin()
+        || (ensClasse(resource.data.get('classe', '')) && request.resource.data.eleveId == resource.data.eleveId
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nom','prenom','annee','whatsapp','annees','updated']))
+        || (signedIn() && resource.data.eleveId == request.auth.uid && request.resource.data.eleveId == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nom','prenom','classe','annee','updated']));
+      allow delete: if isAdmin();
+    }
+
+    /* ---------- Messagerie : une conversation par code de suivi ---------- */
+    function convOk(d) {
+      return d.keys().hasOnly(['nom','classe','dernier','nonLus']) && str(d.nom, 120) && optStr(d, 'classe', 30)
+        && (!('nonLus' in d) || d.nonLus is number);
+    }
+    match /conversations/{code} {
+      allow get: if signedIn();
+      allow list: if isAdmin();
+      allow create: if isAdmin() || (signedIn() && codeOk(code) && convOk(request.resource.data));
+      allow update: if isAdmin()
+        || (signedIn() && codeOk(code) && convOk(request.resource.data)
+            && (!('nonLus' in request.resource.data) || request.resource.data.nonLus >= resource.data.get('nonLus', 0)));
+      allow delete: if isAdmin();
+      match /echanges/{mid} {
+        allow read: if signedIn();
+        allow create: if isAdmin()
+          || (signedIn() && request.resource.data.keys().hasOnly(['de','nom','text','lu','timestamp'])
+              && request.resource.data.de in ['eleve','parent'] && str(request.resource.data.nom, 120)
+              && str(request.resource.data.text, 1000) && request.resource.data.text.size() > 0
+              && request.resource.data.lu == false && isNow(request.resource.data.timestamp));
+        allow update, delete: if isAdmin();
+      }
+    }
+
+    /* ---------- Contenus publics (lecture libre, écriture admin) ---------- */
+    match /annonces/{id}          { allow read: if true; allow write: if isAdmin(); }
+    match /actualites/{id}        { allow read: if true; allow write: if isAdmin(); }
+    match /evenements/{id}        { allow read: if true; allow write: if isAdmin(); }
+    match /personnel/{id}         { allow read: if signedIn(); allow write: if isAdmin(); }   /* profils de l'équipe : membres connectés seulement */
+    match /galerie/{id}           { allow read: if true; allow write: if isAdmin(); }
+    match /site_images/{id}       { allow read: if true; allow write: if isAdmin(); }
+    match /palmares/{id}          { allow read: if true; allow write: if isAdmin(); }
+    match /reussite_stats/{id}    { allow read: if true; allow write: if isAdmin(); }
+    match /emplois_du_temps/{id}  { allow read: if true; allow write: if isAdmin(); }
+    /* Nom du professeur de chaque matière, par classe (affiché sur le bulletin). Lecture : comptes connectés ; écriture : administration. */
+    match /profs_classes/{id}     { allow get: if signedIn(); allow list: if false; allow write: if isAdmin(); }
+    /* Cours et exercices : lecture libre ; un enseignant publie et supprime seulement dans ses matières et ses salles. */
+    match /fichiers/{id} {
+      allow read: if true;
+      allow create: if isAdmin() || (ensMatId(request.resource.data.matiere) && ensClasse(request.resource.data.classe));
+      allow update: if isAdmin() || (ensMatId(resource.data.matiere) && ensClasse(resource.data.classe)
+                       && ensMatId(request.resource.data.matiere) && ensClasse(request.resource.data.classe));
+      allow delete: if isAdmin() || (ensMatId(resource.data.matiere) && ensClasse(resource.data.classe));
+    }
+    match /examens_fichiers/{id} {
+      allow read: if true;
+      allow create: if isAdmin() || (ensMatNom(request.resource.data.matiere) && ensClasse(request.resource.data.classe));
+      allow update, delete: if isAdmin() || (ensMatNom(resource.data.matiere) && ensClasse(resource.data.classe));
+    }
+    match /informations_site/{id} { allow read: if true; allow write: if isAdmin(); }
+
+    /* Contenu modifiable par le super administrateur : direction, proviseurs successifs, textes des pages (textes_<page>). Lecture libre. */
+    match /contenu_site/{id} { allow read: if true; allow write: if isSuper(); }
+
+    /* Groupes WhatsApp des anciens élèves : le lien est saisi par l'administration, lisible seulement après le formulaire (session anonyme) ou connexion. */
+    match /liens_anciens/{id} {
+      allow read: if hasAuth();
+      allow write: if isAdmin();
+    }
+    /* Adhésions : qui a rejoint quel groupe. Création par l'ancien élève, lecture réservée à l'administration. */
+    match /anciens_adhesions/{id} {
+      allow create: if hasAuth()
+        && request.resource.data.keys().hasOnly(['nom','classe','promotion','groupe','createdAt'])
+        && str(request.resource.data.nom, 120) && str(request.resource.data.classe, 40)
+        && str(request.resource.data.promotion, 8) && str(request.resource.data.groupe, 8)
+        && isNow(request.resource.data.createdAt);
+      allow read, update, delete: if isAdmin();
+    }
+
+    /* Configuration : seule la liste des examens est publique. Le reste (ancien mot de passe) est réservé à l'admin. */
+    match /configuration/{id} {
+      allow read: if id == 'examens' || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    /* Liens des groupes WhatsApp : réservés aux personnes connectées (élèves, administrateurs). */
+    match /liens_whatsapp/{id} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    /* ---------- Témoignages : publiés seulement après approbation ---------- */
+    match /temoignages/{id} {
+      allow read: if resource.data.approuve == true || isAdmin();
+      allow create: if isAdmin()
+        || (request.resource.data.keys().hasOnly(['nom','role','texte','approuve','createdAt'])
+            && request.resource.data.approuve == false
+            && str(request.resource.data.nom, 80) && request.resource.data.nom.size() > 0
+            && str(request.resource.data.role, 60) && str(request.resource.data.texte, 600) && request.resource.data.texte.size() > 10
+            && isNow(request.resource.data.createdAt));
+      allow update, delete: if isAdmin();
+    }
+
+    /* ---------- Formulaires publics : écriture validée, lecture réservée à l'admin ---------- */
+    match /demandes/{id} {
+      allow create: if request.resource.data.keys().hasOnly(['type','nom','telephone','email','niveau','message','dateVisite','personnes','page','createdAt'])
+        && request.resource.data.type in ['information','visite','contact']
+        && str(request.resource.data.nom, 120) && request.resource.data.nom.size() > 0
+        && optStr(request.resource.data, 'telephone', 40) && optStr(request.resource.data, 'email', 120)
+        && optStr(request.resource.data, 'niveau', 40) && optStr(request.resource.data, 'message', 2000)
+        && optStr(request.resource.data, 'dateVisite', 20) && optStr(request.resource.data, 'personnes', 4)
+        && optStr(request.resource.data, 'page', 60) && isNow(request.resource.data.createdAt);
+      allow read, update, delete: if isAdmin();
+    }
+    match /anciens/{id} {
+      allow create: if request.resource.data.keys().hasOnly(['nom','promotion','profession','ville','contact','message','page','createdAt'])
+        && str(request.resource.data.nom, 120) && request.resource.data.nom.size() > 0
+        && optStr(request.resource.data, 'promotion', 8) && optStr(request.resource.data, 'profession', 120)
+        && optStr(request.resource.data, 'ville', 120) && str(request.resource.data.contact, 160)
+        && optStr(request.resource.data, 'message', 2000) && optStr(request.resource.data, 'page', 60)
+        && isNow(request.resource.data.createdAt);
+      allow read, update, delete: if isAdmin();
+    }
+    match /preinscriptions/{id} {
+      allow create: if request.resource.data.keys().hasOnly(['nom','prenom','naissance','sexe','classe','etablissement','tuteurNom','telephone','email','adresse','message','documents','statut','page','createdAt'])
+        && str(request.resource.data.nom, 80) && request.resource.data.nom.size() > 0
+        && str(request.resource.data.prenom, 80) && str(request.resource.data.telephone, 40)
+        && str(request.resource.data.tuteurNom, 120) && str(request.resource.data.classe, 40)
+        && optStr(request.resource.data, 'naissance', 20) && optStr(request.resource.data, 'sexe', 10)
+        && optStr(request.resource.data, 'etablissement', 160) && optStr(request.resource.data, 'email', 120)
+        && optStr(request.resource.data, 'adresse', 200) && optStr(request.resource.data, 'message', 2000)
+        && optStr(request.resource.data, 'documents', 1500) && optStr(request.resource.data, 'page', 60)
+        && request.resource.data.get('statut', 'Nouveau') == 'Nouveau' && isNow(request.resource.data.createdAt);
+      allow read, update, delete: if isAdmin();
+    }
+    match /abonnes/{id} {
+      allow create: if request.resource.data.keys().hasOnly(['email','page','createdAt'])
+        && str(request.resource.data.email, 120) && request.resource.data.email.matches('.+@.+\\..+')
+        && optStr(request.resource.data, 'page', 60) && isNow(request.resource.data.createdAt);
+      allow read, update, delete: if isAdmin();
+    }
+
+    /* ---------- Données sensibles : administration uniquement ---------- */
+    /* Notes : un enseignant lit les notes de ses salles et n'écrit que la colonne de sa matière. */
+    match /notes/{id} {
+      allow read: if isAdmin() || ensClasse(resource.data.get('classe', ''));
+      allow create, update: if (isAdmin() || (ensClasse(request.resource.data.classe) && ensNote(request.resource.data.matiere)))
+        && request.resource.data.note is number && request.resource.data.note >= 0 && request.resource.data.note <= 20;   /* une note est toujours entre 0 et 20 */
+      allow delete: if isAdmin() || (ensClasse(resource.data.get('classe', '')) && ensNote(resource.data.get('matiere', '')));
+    }
+    /* Absences : l'enseignant les lit (pour reconstruire le suivi de sa salle) mais ne les modifie pas. */
+    match /absences/{id} {
+      allow read: if isAdmin() || ensClasse(resource.data.get('classe', ''));
+      allow create: if isAdmin() || (ensClasse(request.resource.data.get('classe', '')) && ensMatNom(request.resource.data.get('matiere', '')));   /* l'enseignant fait l'appel de ses salles, dans ses matières */
+      allow update, delete: if isAdmin();
+    }
+    match /messages/{id} { allow read, write: if isAdmin(); }   /* ancien système de messages */
+
+    /* ---------- Notifications ----------
+       - utilisateurs/{uid}/notifs : notifications personnelles (validation d'un compte…). Lecture : le titulaire. Écriture : administration.
+       - familles/{code}/notifs : notifications d'un élève et de ses parents (absence, message…). Même principe que suivi/{code} : le code est le secret.
+       - notifs_publiques : annonces à tous ou à une classe (nouvelle actualité, nouveaux cours…). Lecture libre, écriture administration.
+       - notifs_staff : alertes pour l'administration (nouvelle inscription, nouveau message…). Tout compte connecté peut en créer une ; seule l'administration lit.
+       - appareils/{jeton} : jetons d'envoi (notifications téléphone fermé). Jamais lisibles depuis le site ; lus seulement par les Cloud Functions. */
+    function notifOk(d) { return str(d.titre, 120) && optStr(d, 'texte', 300) && optStr(d, 'lien', 120) && d.date is number; }
+    match /utilisateurs/{uid}/notifs/{id} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create: if (isAdmin() || isEns()) && notifOk(request.resource.data);
+      allow delete: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow update: if false;
+    }
+    /* Code parent publié pour l'élève : lui seul (et le super administrateur) le lit ; seul le super administrateur l'écrit. */
+    match /utilisateurs/{uid}/code_parent/{doc} {
+      allow read: if (signedIn() && request.auth.uid == uid) || isSuper();
+      allow write: if isSuper();
+    }
+    /* Planning personnel de l'élève : synchronisé entre ses appareils. Lui seul lit et écrit. */
+    match /utilisateurs/{uid}/planning/{doc} {
+      allow read, delete: if signedIn() && request.auth.uid == uid;
+      allow create, update: if signedIn() && request.auth.uid == uid && doc == 'perso'
+        && request.resource.data.keys().hasOnly(['json','maj']) && str(request.resource.data.json, 20000) && request.resource.data.maj is number;
+    }
+    match /familles/{code}/notifs/{id} {
+      allow read: if signedIn() && codeOk(code);
+      allow create: if (isAdmin() || isEns()) && notifOk(request.resource.data);
+      allow update, delete: if isAdmin();
+    }
+    match /notifs_publiques/{id} {
+      allow read: if true;
+      allow create: if isAdmin() && notifOk(request.resource.data) && request.resource.data.get('cible', 'tous') is string;
+      allow update, delete: if isAdmin();
+    }
+    match /notifs_staff/{id} {
+      allow read: if isAdmin();
+      allow create: if signedIn() && notifOk(request.resource.data) && request.resource.data.pour in ['admin', 'super']
+        && request.resource.data.keys().hasOnly(['pour','titre','texte','lien','date']);
+      allow update, delete: if isAdmin();
+    }
+    match /appareils/{token} {
+      allow read: if false;
+      allow create, update: if signedIn() && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid','role','codes','classes','maj'])
+        && request.resource.data.codes is list && request.resource.data.codes.size() <= 12
+        && request.resource.data.classes is list && request.resource.data.classes.size() <= 12;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+    match /journal/{id} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if false;
+    }
+  }
+}

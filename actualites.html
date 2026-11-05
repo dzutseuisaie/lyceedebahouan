@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+
+<title>Actualités | Lycée de Bahouan</title>
+<meta name="description" content="Les nouvelles et les événements du Lycée de Bahouan.">
+<link rel="icon" type="image/jpeg" href="images/logo.jpg">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0a2a5c">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,400&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css?v=24.0">
+</head>
+<body>
+<div id="site-header"></div>
+<main>
+<section class="hero page" data-img="banniere-actualites" style="background-image:url('images/actualites.jpg')"><div class="wrap"><h1 data-cms="h1_a3baa78">Actualités</h1><p data-cms="p_2801136" class="lead">Ce qui se passe au lycée.</p></div></section>
+
+<section class="section"><div class="wrap">
+  <div id="liste" class="cartes"><p style="color:var(--gris)">Chargement des actualités…</p></div>
+  <div class="evts" id="evts" hidden></div>
+</div></section>
+</main>
+<div id="site-footer"></div>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="assets/config.js?v=24.0"></script>
+<script src="assets/site.js?v=24.0"></script>
+<script src="assets/i18n.js?v=24.0"></script>
+<script src="assets/auth.js?v=24.0"></script>
+<script src="assets/faq-data.js?v=24.0"></script>
+<script src="assets/extras.js?v=24.0"></script>
+<script>
+(async function(){
+  const box = document.getElementById('liste');
+  if(!window.DB){ box.innerHTML='<p>Les actualités ne sont pas disponibles pour le moment.</p>'; return; }
+  try{
+    const snap = await window.DB.collection('actualites').orderBy('date','desc').get();
+    const out=[]; snap.forEach(d=>{const a=d.data(); const im=a.image?window.cld(a.image,900):'images/actualite-defaut.jpg';
+      const txt=(a.texte||a.resume||'').split(/\n+/).map(p=>'<p>'+esc(p)+'</p>').join('');
+      out.push(`<article class="carte" id="${d.id}"><div class="im" style="background-image:url('${esc(im)}')"></div><time>${esc(fmtDate(a.date))}</time><h3>${esc(a.titre||'')}</h3>${txt}</article>`);});
+    box.innerHTML = out.length ? out.join('') : '<p style="color:var(--gris)">Aucune actualité publiée pour le moment. Revenez bientôt.</p>';
+    if(location.hash){const t=document.querySelector(location.hash); t&&t.scrollIntoView();}
+  }catch(e){ box.innerHTML='<p>Les actualités ne sont pas disponibles pour le moment.</p>'; }
+  try{
+    const snap = await window.DB.collection('evenements').orderBy('date').get(); const today=new Date().toISOString().slice(0,10); const l=[];
+    snap.forEach(d=>{const x=d.data(); if((x.date||'')>=today) l.push(x);});
+    if(l.length){const e=document.getElementById('evts'); e.hidden=false;
+      e.innerHTML='<h2 style="margin-top:40px">Événements à venir</h2>'+l.map(x=>{const dt=new Date(x.date+'T12:00:00');
+        return `<div class="evt"><div><b>${dt.getDate()}</b><small>${dt.toLocaleDateString('fr-FR',{month:'long',year:'numeric'})}</small></div><div><h3 style="margin:0 0 4px;font-size:1.3rem">${esc(x.titre||'')}</h3><span style="color:var(--gris)">${esc(x.lieu||'')} ${esc(x.description||'')}</span></div></div>`;}).join('');}
+  }catch(e){}
+})();
+</script>
+</body>
+</html>

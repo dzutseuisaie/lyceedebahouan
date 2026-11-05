@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+
+<title>Réussite et tableau d’honneur | Lycée de Bahouan</title>
+<meta name="description" content="Résultats aux examens, tableau d’honneur et témoignages du Lycée de Bahouan.">
+<link rel="icon" type="image/jpeg" href="images/logo.jpg">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0a2a5c">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,400&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css?v=24.0">
+</head>
+<body>
+<div id="site-header"></div>
+<main>
+<section class="hero page" data-img="banniere-reussite" style="background-image:url('images/reussite.jpg')"><div class="wrap"><h1 data-cms="h1_36aefa8">Réussite et tableau d'honneur</h1><p data-cms="p_20fb4bb" class="lead">Résultats, élèves méritants et paroles de la communauté.</p></div></section>
+
+<section class="section" id="resultats"><div class="wrap"><h2 data-cms="h2_09d61e5">Résultats <em>aux examens</em></h2><div id="stats"><p style="color:var(--gris)">Chargement…</p></div></div></section>
+<section class="section ivoire" id="honneur"><div class="wrap"><h2 data-cms="h2_1cac555">Tableau <em>d'honneur</em></h2><p data-cms="p_a62e80e">Les élèves qui font la fierté du lycée.</p><div class="honneur" id="hon"></div></div></section>
+<section class="section" id="temoignages"><div class="wrap"><h2 data-cms="h2_2566346">Ils <em>témoignent</em></h2><div class="temo" id="tem"></div>
+  <div style="margin-top:48px;max-width:640px"><h3 data-cms="h3_b18764d">Partager mon témoignage</h3><p data-cms="p_a011c6a" style="color:var(--gris)">Élève, parent ou ancien : votre message sera lu par l'administration avant d'être publié.</p>
+  <form class="form" id="f-tem"><label>Votre nom<input name="nom" required maxlength="80"></label><label>Vous êtes<select name="role"><option>Élève</option><option>Parent</option><option>Ancien élève</option><option>Enseignant</option></select></label><label>Votre témoignage<textarea name="texte" required minlength="20" maxlength="600"></textarea></label><button class="btn dark" type="submit">Envoyer</button><div class="msg" role="status"></div></form></div></div></section>
+</main>
+<div id="site-footer"></div>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="assets/config.js?v=24.0"></script>
+<script src="assets/site.js?v=24.0"></script>
+<script src="assets/i18n.js?v=24.0"></script>
+<script src="assets/auth.js?v=24.0"></script>
+<script src="assets/faq-data.js?v=24.0"></script>
+<script src="assets/extras.js?v=24.0"></script>
+<script>
+(async function(){
+  const vide=(t)=>'<p style="color:var(--gris)">'+t+'</p>';
+  try{ const s=await DB.collection('reussite_stats').get(); const l=s.docs.map(d=>d.data()).sort((a,b)=>String(b.annee).localeCompare(String(a.annee)));
+    document.getElementById('stats').innerHTML=l.length?l.map(x=>{const t=x.presentes?x.admis/x.presentes*100:0;return '<div class="taux"><b style="min-width:180px">'+esc(x.examen)+' '+esc(x.annee)+'</b><div class="barre"><i style="width:'+t.toFixed(1)+'%"></i></div><span>'+x.admis+' / '+x.presentes+' ('+t.toFixed(1)+' %)</span></div>';}).join(''):vide('Les résultats seront publiés prochainement.');
+  }catch(e){document.getElementById('stats').innerHTML=vide('Résultats indisponibles pour le moment.');}
+  try{ const s=await DB.collection('palmares').get(); const l=s.docs.map(d=>d.data()).sort((a,b)=>String(b.annee).localeCompare(String(a.annee)));
+    document.getElementById('hon').innerHTML=l.length?l.map(x=>{const ini=x.nom.split(' ').map(w=>w[0]).slice(0,2).join('');return '<figure>'+(x.photo?'<div class="ph" style="background-image:url(\''+esc(cld(x.photo,360))+'\')" role="img" aria-label="'+esc(x.nom)+'"></div>':'<div class="ph">'+esc(ini)+'</div>')+'<b>'+esc(x.nom)+'</b><span>'+esc(x.distinction)+'<br>'+esc(x.classe)+' · '+esc(x.annee)+'</span></figure>';}).join(''):vide('Le tableau d\'honneur sera publié prochainement.');
+  }catch(e){}
+  try{ const s=await DB.collection('temoignages').where('approuve','==',true).get(); const l=s.docs.map(d=>d.data());
+    document.getElementById('tem').innerHTML=l.length?l.map(x=>'<blockquote>« '+esc(x.texte)+' »<cite>'+esc(x.nom)+' · '+esc(x.role)+'</cite></blockquote>').join(''):vide('Soyez le premier à témoigner.');
+  }catch(e){}
+  const f=document.getElementById('f-tem'); const hp=document.createElement('input'); hp.name='website'; hp.tabIndex=-1; hp.autocomplete='off'; hp.style.cssText='position:absolute;left:-9999px'; f.appendChild(hp);
+  f.onsubmit=async e=>{ e.preventDefault(); const m=f.querySelector('.msg'); m.className='msg';
+    if(hp.value){f.reset(); m.className='msg ok'; m.textContent='Merci !'; return;}
+    if(Date.now()-(+localStorage.getItem('bhn_cd_tem')||0)<120000){m.className='msg err';m.textContent='Merci de patienter quelques minutes avant un nouvel envoi.';return;}
+    try{ await DB.collection('temoignages').add({nom:f.nom.value.trim().slice(0,80),role:f.role.value,texte:f.texte.value.trim().slice(0,600),approuve:false,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+      localStorage.setItem('bhn_cd_tem',String(Date.now())); f.reset(); m.className='msg ok'; m.textContent='Merci ! Votre témoignage sera publié après relecture.';
+    }catch(err){m.className='msg err';m.textContent="L'envoi a échoué. Réessayez plus tard.";}
+  };
+})();
+</script>
+</body>
+</html>

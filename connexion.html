@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+
+<title>Connexion | Lycée de Bahouan</title>
+<meta name="description" content="Connexion au Lycée de Bahouan : espace élève, espace parent et administration.">
+<link rel="icon" type="image/jpeg" href="images/logo.jpg">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0a2a5c">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,400&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css?v=24.0">
+<link rel="stylesheet" href="assets/espace.css?v=24.0">
+</head>
+<body class="app">
+<div id="site-header"></div>
+<main>
+<section class="hero page" data-img="banniere-connexion" style="background-image:url('images/connexion.jpg')"><div class="wrap"><h1>Se connecter</h1><p class="lead">Élèves, parents et administration : un seul site, trois espaces.</p></div></section>
+
+<section class="section"><div class="wrap">
+  <div id="v-session" hidden class="carte-app" style="max-width:760px"></div>
+
+  <div id="v-choix">
+    <h2>Choisissez votre <em>espace</em></h2>
+    <p>Chaque espace donne accès aux outils qui vous concernent. Une fois connecté, vous restez connecté sur cet appareil.</p>
+    <div class="choix">
+      <button type="button" data-role="eleve"><b>Élève</b><span>Notes, présence, cours et épreuves, emploi du temps, messagerie. Vous vous inscrivez une seule fois.</span></button>
+      <button type="button" data-role="parent"><b>Parent</b><span>Notes et présence de vos enfants, résultats d'examens, messages à l'école. Un compte par parent, avec un code par enfant.</span></button>
+      <button type="button" data-role="admin"><b>Administration</b><span>Gestion du lycée et du site. Réservé à l'équipe, avec mot de passe.</span></button>
+    </div>
+  </div>
+
+  <div id="v-eleve" hidden>
+    <p><button class="petit-lien" type="button" data-retour>← Choisir un autre espace</button></p>
+    <div class="boite">
+      <h2 id="el-titre">Espace élève</h2>
+      <div class="onglets" role="tablist">
+        <button type="button" role="tab" id="t-ins" aria-selected="true">Première visite : m'inscrire</button>
+        <button type="button" role="tab" id="t-con" aria-selected="false">J'ai déjà un compte</button>
+      </div>
+
+      <form class="form" id="f-ver" style="max-width:none">
+        <p class="sous">Entrez votre nom pour retrouver votre fiche. Si vous êtes dans la liste du lycée, vous entrez directement dans votre espace.</p>
+        <div class="form" style="grid-template-columns:1fr 1fr;max-width:none">
+          <label>Nom<input name="nom" required autocomplete="family-name"></label>
+          <label>Prénom<input name="prenom" required autocomplete="given-name"></label>
+          <label style="grid-column:1/-1">Classe<select name="classe" required id="ver-classe"></select></label>
+          <label style="grid-column:1/-1">Année académique<span data-annee-slot><input name="annee" required inputmode="numeric" maxlength="9" placeholder="2026/2027"></span></label>
+        </div>
+        <button class="btn dark" type="submit">Vérifier mon nom</button>
+        <div class="msg" role="status"></div>
+      </form>
+
+      <form class="form" id="f-ins" style="max-width:none" hidden>
+        <div class="annonce" id="ins-info" role="status"><b>Votre nom ne se trouve pas dans la base de données.</b> Vous pouvez vous inscrire : l'administration validera votre inscription.</div>
+        <div class="form" style="grid-template-columns:1fr 1fr;max-width:none">
+          <label>Nom<input name="nom" required autocomplete="family-name"></label>
+          <label>Prénom<input name="prenom" required autocomplete="given-name"></label>
+          <label>Âge<input name="age" type="number" min="8" max="30" required></label>
+          <label>Classe<select name="classe" required id="ins-classe"></select></label>
+          <label>Année académique<span data-annee-slot><input name="annee" required inputmode="numeric" maxlength="9" placeholder="2026/2027"></span></label>
+          <label>Matricule (facultatif)<input name="matricule"></label>
+        </div>
+        <label>Adresse e-mail<input name="email" type="email" required autocomplete="email"></label>
+        <label>Mot de passe (6 caractères minimum)<input name="password" type="password" minlength="6" required autocomplete="new-password"></label>
+        <button class="btn dark" type="submit">Créer mon compte</button>
+        <div class="msg" role="status"></div>
+      </form>
+
+      <form class="form" id="f-con" style="max-width:none" hidden>
+        <label>Adresse e-mail<input name="email" type="email" required autocomplete="email"></label>
+        <label>Mot de passe<input name="password" type="password" required autocomplete="current-password"></label>
+        <button class="btn dark" type="submit">Me connecter</button>
+        <button class="petit-lien" type="button" id="oubli">Mot de passe oublié ?</button>
+        <div class="msg" role="status"></div>
+      </form>
+
+      <div class="sep">ou</div>
+      <button class="btn google" type="button" id="bt-google"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg><span>Connexion avec Google</span></button>
+      <div class="msg" id="g-msg" role="status" style="margin-top:12px"></div>
+    </div>
+  </div>
+
+  <div id="v-parent" hidden>
+    <p><button class="petit-lien" type="button" data-retour>← Choisir un autre espace</button></p>
+    <div class="boite">
+      <h2>Espace parent</h2>
+      <div class="onglets" role="tablist">
+        <button type="button" role="tab" id="tp-ins" aria-selected="true">Créer mon compte parent</button>
+        <button type="button" role="tab" id="tp-con" aria-selected="false">J'ai déjà un compte</button>
+      </div>
+      <form class="form" id="fp-ins" style="max-width:none">
+        <label>Nom complet<input name="nom" required maxlength="80" autocomplete="name"></label>
+        <label>Adresse e-mail<input name="email" type="email" required autocomplete="email"></label>
+        <label>Mot de passe (6 caractères minimum)<input name="password" type="password" minlength="6" required autocomplete="new-password"></label>
+        <button class="btn dark" type="submit">Créer mon compte</button>
+        <p style="font-size:.92rem;color:var(--gris);margin:0">Après la création du compte, vous ajouterez le code de suivi de chacun de vos enfants.</p>
+        <div class="msg" role="status"></div>
+      </form>
+      <form class="form" id="fp-con" style="max-width:none" hidden>
+        <label>Adresse e-mail<input name="email" type="email" required autocomplete="email"></label>
+        <label>Mot de passe<input name="password" type="password" required autocomplete="current-password"></label>
+        <button class="btn dark" type="submit">Me connecter</button>
+        <button class="petit-lien" type="button" id="pp-oubli">Mot de passe oublié ?</button>
+        <div class="msg" role="status"></div>
+      </form>
+      <div class="sep">ou</div>
+      <button class="btn google" type="button" id="bp-google"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg><span>Connexion avec Google</span></button>
+      <div class="msg" id="pg-msg" role="status" style="margin-top:12px"></div>
+    </div>
+  </div>
+
+  <div id="v-admin" hidden>
+    <p><button class="petit-lien" type="button" data-retour>← Choisir un autre espace</button></p>
+    <div class="boite">
+      <h2>Administration et enseignants</h2>
+      <div class="onglets" role="tablist">
+        <button type="button" role="tab" id="t-adm" aria-selected="true">Me connecter</button>
+        <button type="button" role="tab" id="t-ens" aria-selected="false">Enseignant : demander l'accès</button>
+      </div>
+
+      <form class="form" id="f-adm" style="max-width:none" autocomplete="on">
+        <p style="color:var(--gris);margin:0">Administration et enseignants déjà validés : connectez-vous avec votre adresse e-mail.</p>
+        <label>Adresse e-mail<input name="email" type="email" required autocomplete="username"></label>
+        <label>Mot de passe<input name="password" type="password" id="adm-pw" required autocomplete="current-password"></label>
+        <label class="case" style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" name="rester" checked> Rester connecté sur cet appareil</label>
+        <button class="btn dark" type="submit" id="adm-btn">Entrer</button>
+        <button class="petit-lien" type="button" id="adm-oubli">Mot de passe oublié ?</button>
+        <div class="msg" role="status"></div>
+        <p style="font-size:.88rem;color:var(--gris);margin:0">Case décochée (ordinateur partagé) : session fermée après 30 minutes sans activité. Case cochée : vous restez connecté jusqu'à « Se déconnecter ».</p>
+      </form>
+
+      <form class="form" id="f-ens" style="max-width:none" hidden>
+        <p style="color:var(--gris);margin:0">Créez votre compte, choisissez vos matières et vos salles. Le super administrateur vérifie puis valide votre demande : vous n'aurez accès qu'à ces matières et à ces salles.</p>
+        <label>Civilité<select name="civilite"><option value="M.">Monsieur</option><option value="Mme">Madame</option></select></label>
+        <label>Nom et prénom<input name="nom" required maxlength="80" autocomplete="name"></label>
+        <label>Adresse e-mail<input name="email" type="email" required autocomplete="email"></label>
+        <label>Mot de passe (6 caractères minimum)<input name="password" type="password" minlength="6" required autocomplete="new-password"></label>
+        <fieldset class="choix-multi"><legend>Mes matières (une ou plusieurs)</legend><div id="ens-mat"></div></fieldset>
+        <fieldset class="choix-multi"><legend>Mes salles de classe</legend><div id="ens-cl"></div></fieldset>
+        <button class="btn dark" type="submit">Envoyer ma demande</button>
+        <div class="msg" role="status"></div>
+      </form>
+    </div>
+  </div>
+</div></section>
+</main>
+<div id="site-footer"></div>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="assets/config.js?v=24.0"></script>
+<script src="assets/site.js?v=24.0"></script>
+<script src="assets/i18n.js?v=24.0"></script>
+<script src="assets/auth.js?v=24.0"></script>
+<script src="assets/notif.js?v=24.0"></script>
+<script src="assets/faq-data.js?v=24.0"></script>
+<script src="assets/extras.js?v=24.0"></script>
+<script src="assets/lib.js?v=24.0"></script>
+<script src="assets/connexion.js?v=24.0"></script>
+</body>
+</html>
